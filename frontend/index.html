@@ -28,12 +28,34 @@
             Create a jar, accept tips, and withdraw whenever the target is reached.
           </p>
 
-          <div class="jar-figure" aria-label="A stylized tip jar">
-            <div class="coin coin-one">Ξ</div>
-            <div class="coin coin-two">Ξ</div>
-            <div class="jar-lid"></div>
-            <div class="jar-neck"></div>
-            <div class="jar-body"><span id="jarBalance">0 ETH</span></div>
+          <div class="jar-figure" aria-label="Tip jar showing current balance">
+            <svg viewBox="0 0 250 255" role="img" aria-labelledby="jarSvgTitle jarSvgDescription">
+              <title id="jarSvgTitle">Tip jar</title>
+              <desc id="jarSvgDescription">The jar fill represents the selected jar's progress toward its target.</desc>
+              <defs>
+                <clipPath id="jarShapeClip">
+                  <path d="M38 88 Q38 84 48 84 H202 Q212 84 212 94 V184 Q212 222 182 238 Q152 254 98 254 Q48 254 38 218 Z" />
+                </clipPath>
+              </defs>
+              <rect x="75" y="58" width="100" height="18" rx="2" fill="#2548e8" stroke="#171713" stroke-width="2" />
+              <path d="M88 76V88H162V76" fill="#fffdf5" stroke="#171713" stroke-width="2" />
+              <rect id="jarFill" x="38" y="254" width="174" height="0" fill="#2548e8" clip-path="url(#jarShapeClip)" />
+              <path d="M38 88 Q38 84 48 84 H202 Q212 84 212 94 V184 Q212 222 182 238 Q152 254 98 254 Q48 254 38 218 Z"
+                fill="rgba(255, 253, 245, 0.72)" fill-opacity=".72" stroke="#171713" stroke-width="2" />
+              <path d="M48 225 Q125 198 202 225" fill="none" stroke="#171713" stroke-width="2" />
+              <g class="jar-coins">
+                <g class="coin coin-one">
+                  <circle cx="78" cy="38" r="23" fill="#fffdf5" stroke="#171713" stroke-width="2" />
+                  <text x="78" y="47" text-anchor="middle" fill="#2548e8" font-family="Georgia, serif" font-size="28">Ξ</text>
+                </g>
+                <g class="coin coin-two">
+                  <circle cx="190" cy="30" r="23" fill="#fffdf5" stroke="#171713" stroke-width="2" />
+                  <text x="190" y="39" text-anchor="middle" fill="#2548e8" font-family="Georgia, serif" font-size="28">Ξ</text>
+                </g>
+              </g>
+              <text id="jarBalance" x="125" y="180" text-anchor="middle" fill="#171713"
+                font-family="Georgia, serif" font-size="13" font-weight="700">0 ETH</text>
+            </svg>
           </div>
         </div>
 
@@ -351,6 +373,10 @@
             ? (unlocked ? 100 : 0)
             : Math.min(100, Number(balance * 100n / target));
           document.getElementById("progressBar").style.width = `${progress}%`;
+          const jarFill = document.getElementById("jarFill");
+          const fillHeight = 170 * progress / 100;
+          jarFill.setAttribute("y", String(254 - fillHeight));
+          jarFill.setAttribute("height", String(fillHeight));
 
           withdrawButton.disabled = !unlocked;
           withdrawButton.textContent = unlocked
