@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f2eedf" />
+    <title>Tip Jar</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Tip Jar home">
+          <span class="brand-mark" aria-hidden="true">T</span>
+          <span>Tip Jar</span>
+        </a>
+        <button class="wallet-button" id="connectButton" type="button">
+          Connect wallet
+        </button>
+      </header>
+
+      <section class="hero">
+        <div class="intro">
+          <p class="kicker">Direct on-chain appreciation</p>
+          <h1>Leave a little<br /><em>thanks.</em></h1>
+          <p class="lede">
+            Every tip goes directly to the creator and a shared recipient.
+          </p>
+
+          <div class="jar-figure" aria-label="A stylized tip jar">
+            <div class="coin coin-one">Ξ</div>
+            <div class="coin coin-two">Ξ</div>
+            <div class="jar-lid"></div>
+            <div class="jar-neck"></div>
+            <div class="jar-body">
+              <span>THANKS!</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="tip-panel" aria-label="Send a tip">
+          <div class="panel-heading">
+            <span>Choose an amount</span>
+            <span class="currency" id="networkName">ETH</span>
+          </div>
+
+          <div class="amount-grid" role="radiogroup" aria-label="Tip amount">
+            <button class="amount-button" type="button" data-amount="0.001" role="radio" aria-checked="false">
+              0.001
+            </button>
+            <button class="amount-button selected" type="button" data-amount="0.005" role="radio" aria-checked="true">
+              0.005
+            </button>
+            <button class="amount-button" type="button" data-amount="0.01" role="radio" aria-checked="false">
+              0.01
+            </button>
+          </div>
+
+          <label class="field-label" for="amountInput">Other amount</label>
+          <div class="amount-input-wrap">
+            <input id="amountInput" type="number" min="0" step="0.001" value="0.005" inputmode="decimal" />
+            <span>ETH</span>
+          </div>
+
+          <label class="field-label" for="messageInput">Add a note</label>
+          <textarea id="messageInput" maxlength="280" rows="3" placeholder="Thanks for making this!"></textarea>
+
+          <div class="split-summary">
+            <span>You send</span>
+            <strong id="sendAmount">0.005 ETH</strong>
+          </div>
+
+          <button class="send-button" id="sendButton" type="button">
+            <span id="sendButtonText">Send tip</span>
+            <span aria-hidden="true">→</span>
+          </button>
+
+          <p class="status" id="status" role="status" aria-live="polite"></p>
+        </aside>
+      </section>
+
+      <section class="activity">
+        <div class="activity-heading">
+          <h2>Recent thanks</h2>
+          <button class="text-button" id="refreshButton" type="button">Refresh</button>
+        </div>
+
+        <div class="split-details" id="splitDetails">
+          <span>20% shared</span>
+          <span id="contractAddress">Contract not configured</span>
+        </div>
+
+        <div class="tips-list" id="tipsList">
+          <div class="empty-state">
+            <span>Nothing in the jar yet.</span>
+          </div>
+        </div>
+      </section>
+
+      <details class="contract-settings">
+        <summary>Contract settings</summary>
+        <div class="settings-row">
+          <label for="contractInput">Deployed contract address</label>
+          <div>
+            <input id="contractInput" type="text" placeholder="0x..." spellcheck="false" />
+            <button id="saveContractButton" type="button">Use contract</button>
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+    <script>
+      const ABI = [
+        "function owner() view returns (address)",
+        "function splitRecipient() view returns (address)",
+        "function splitBps() view returns (uint16)",
+        "function tip(string message) payable",
+        "function getTipsCount() view returns (uint256)",
+        "function getTip(uint256 index) view returns (tuple(address sender, uint256 amount, string message, uint256 timestamp))",
+        "event TipReceived(address indexed sender, uint256 totalAmount, uint256 splitAmount, string message)"
+      ];
+
+      const state = {
+        provider: null,
+        signer: null,
+        contractAddress: localStorage.getItem("splitTipJarAddress") ||
+          new URLSearchParams(window.location.search).get("contract") ||
+          "",
+        selectedAmount: "0.005"
+      };
+
+      const connectButton = document.getElementById("connectButton");
+      const sendButton = document.getElementById("sendButton");
+      const sendButtonText = document.getElementById("sendButtonText");
+      const amountInput = document.getElementById("amountInput");
+      const messageInput = document.getElementById("messageInput");
+      const statusElement = document.getElementById("status");
+      const contractInput = document.getElementById("contractInput");
+      const contractAddress = document.getElementById("contractAddress");
+      const tipsList = document.getElementById("tipsList");
+
+      function setStatus(message, kind = "") {
+        statusElement.textContent = message;
+        statusElement.className = `status${kind ? ` ${kind}` : ""}`;
+      }
+
+      function shortenAddress(address) {
+        return `${address.slice(0, 6)}…${address.slice(-4)}`;
+      }
+
+      function formatDate(timestamp) {
+        if (!timestamp) return "Just now";
+        const date = new Date(Number(timestamp) * 1000);
+        return new Intl.DateTimeFormat(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        }).format(date);
+      }
+
+      function getContract(signerOrProvider = state.provider) {
+        if (!state.contractAddress) throw new Error("Enter a deployed contract address.");
+        return new ethers.Contract(state.contractAddress, ABI, signerOrProvider);
+      }
+
+      async function connectWallet() {
+        if (!window.ethereum) {
+          setStatus("Install MetaMask or another Ethereum wallet.", "error");
+          return;
+        }
+
+        try {
+          state.provider = new ethers.BrowserProvider(window.ethereum);
+          await state.provider.send("eth_requestAccounts", []);
+          state.signer = await state.provider.getSigner();
+          const address = await state.signer.getAddress();
+          const network = await state.provider.getNetwork();
+          connectButton.textContent = shortenAddress(address);
+          document.getElementById("networkName").textContent =
+            network.name === "unknown" ? `Chain ${network.chainId}` : network.name;
+          setStatus("Wallet connected.");
+          await loadContract();
+        } catch (error) {
+          setStatus(error.shortMessage || error.message, "error");
+        }
+      }
+
+      async function loadContract() {
+        if (!state.contractAddress) {
+          contractAddress.textContent = "Contract not configured";
+          return;
+        }
+
+        contractInput.value = state.contractAddress;
+        contractAddress.textContent = shortenAddress(state.contractAddress);
+
+        try {
+          const contract = getContract();
+          const [splitBps, recipient] = await Promise.all([
+            contract.splitBps(),
+            contract.splitRecipient()
+          ]);
+          const percent = Number(splitBps) / 100;
+          document.getElementById("splitDetails").innerHTML =
+            `<span>${percent}% shared</span>` +
+            `<span title="${recipient}">Recipient ${shortenAddress(recipient)}</span>`;
+          await loadTips(contract);
+        } catch (error) {
+          setStatus(error.shortMessage || "Could not read this contract.", "error");
+        }
+      }
+
+      async function loadTips(contract = null) {
+        if (!state.contractAddress) return;
+
+        try {
+          const jar = contract || getContract();
+          const count = await jar.getTipsCount();
+          const indexes = [];
+          for (let index = Number(count) - 1; index >= 0 && indexes.length < 8; index--) {
+            indexes.push(index);
+          }
+
+          if (indexes.length === 0) {
+            tipsList.innerHTML = `<div class="empty-state"><span>Nothing in the jar yet.</span></div>`;
+            return;
+          }
+
+          const tips = await Promise.all(indexes.map((index) => jar.getTip(index)));
+          tipsList.innerHTML = tips.map((tip) => `
+            <article class="tip-row">
+              <div class="tip-identity">
+                <span class="tip-avatar" aria-hidden="true">Ξ</span>
+                <div>
+                  <strong>${shortenAddress(tip.sender)}</strong>
+                  <time>${formatDate(tip.timestamp)}</time>
+                </div>
+              </div>
+              <p>${escapeHtml(tip.message || "A little thanks")}</p>
+              <strong class="tip-amount">${ethers.formatEther(tip.amount)} ETH</strong>
+            </article>
+          `).join("");
+        } catch (error) {
+          setStatus(error.shortMessage || "Could not load recent tips.", "error");
+        }
+      }
+
+      function escapeHtml(value) {
+        const element = document.createElement("div");
+        element.textContent = value;
+        return element.innerHTML;
+      }
+
+      document.querySelectorAll(".amount-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.querySelectorAll(".amount-button").forEach((item) => {
+            item.classList.remove("selected");
+            item.setAttribute("aria-checked", "false");
+          });
+          button.classList.add("selected");
+          button.setAttribute("aria-checked", "true");
+          state.selectedAmount = button.dataset.amount;
+          amountInput.value = state.selectedAmount;
+          updateSendAmount();
+        });
+      });
+
+      function updateSendAmount() {
+        document.getElementById("sendAmount").textContent =
+          `${amountInput.value || "0"} ETH`;
+      }
+
+      amountInput.addEventListener("input", () => {
+        document.querySelectorAll(".amount-button").forEach((item) => {
+          item.classList.remove("selected");
+          item.setAttribute("aria-checked", "false");
+        });
+        updateSendAmount();
+      });
+
+      sendButton.addEventListener("click", async () => {
+        if (!state.signer) {
+          await connectWallet();
+          if (!state.signer) return;
+        }
+
+        if (!state.contractAddress) {
+          setStatus("Enter and save a deployed contract address first.", "error");
+          document.querySelector(".contract-settings").open = true;
+          contractInput.focus();
+          return;
+        }
+
+        const amount = amountInput.value;
+        if (!amount || Number(amount) <= 0) {
+          setStatus("Enter an amount greater than zero.", "error");
+          return;
+        }
+
+        sendButton.disabled = true;
+        sendButtonText.textContent = "Sending...";
+
+        try {
+          const contract = getContract(state.signer);
+          const transaction = await contract.tip(messageInput.value.trim(), {
+            value: ethers.parseEther(amount)
+          });
+          setStatus("Tip submitted. Waiting for confirmation...");
+          await transaction.wait();
+          setStatus("Tip delivered. Thank you!");
+          messageInput.value = "";
+          await loadTips(contract);
+        } catch (error) {
+          setStatus(error.shortMessage || error.message, "error");
+        } finally {
+          sendButton.disabled = false;
+          sendButtonText.textContent = "Send tip";
+        }
+      });
+
+      document.getElementById("saveContractButton").addEventListener("click", async () => {
+        const address = contractInput.value.trim();
+
+        try {
+          const checksumAddress = ethers.getAddress(address);
+          state.contractAddress = checksumAddress;
+          localStorage.setItem("splitTipJarAddress", checksumAddress);
+          setStatus("Contract address saved.");
+          await loadContract();
+        } catch {
+          setStatus("Enter a valid Ethereum contract address.", "error");
+        }
+      });
+
+      document.getElementById("refreshButton").addEventListener("click", async () => {
+        await loadTips();
+        setStatus("Recent tips refreshed.");
+      });
+
+      connectButton.addEventListener("click", connectWallet);
+
+      contractInput.value = state.contractAddress;
+      updateSendAmount();
+      if (state.contractAddress) {
+        loadContract();
+      }
+
+      if (window.ethereum) {
+        window.ethereum.on("accountsChanged", connectWallet);
+      }
+    </script>
+  </body>
+</html>
