@@ -537,8 +537,8 @@ textarea {
   text-transform: uppercase;
 }
 
-.jar-status.withdrawn {
-  color: #b52e20;
+.jar-row.active .jar-status {
+  color: var(--white);
 }
 
 .create-jar-section {
@@ -650,41 +650,6 @@ textarea {
   min-height: 72px;
   padding: 18px 0;
   border-bottom: 1px solid var(--soft-line);
-}
-
-.jar-filters {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 18px;
-}
-
-.jar-filter {
-  height: 38px;
-  border: 1px solid var(--ink);
-  background: transparent;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.jar-filter.active {
-  color: var(--white);
-  background: var(--ink);
-}
-
-.jar-filters input {
-  min-width: 220px;
-  height: 38px;
-  border: 1px solid var(--ink);
-  background: var(--white);
-  padding: 0 10px;
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.jar-filters input[hidden] {
-  display: none;
 }
 
 .jar-row {
@@ -879,14 +844,6 @@ textarea {
 
   .jar-list {
     grid-template-columns: 1fr;
-  }
-
-  .jar-filters {
-    flex-wrap: wrap;
-  }
-
-  .jar-filters input {
-    width: 100%;
   }
 
   .create-row {
