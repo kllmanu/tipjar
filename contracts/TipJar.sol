@@ -12,9 +12,7 @@ contract TipJar {
     address public immutable owner;
     string public name;
     uint256 public immutable targetAmount;
-    uint256 public immutable unlockTime;
 
-    bool public withdrawn;
     bool private withdrawing;
     Tip[] private tips;
 
@@ -25,26 +23,20 @@ contract TipJar {
     error InvalidUnlockCondition();
     error NotOwner();
     error WithdrawLocked();
-    error AlreadyWithdrawn();
     error TransferFailed();
 
     constructor(
         address _owner,
         string memory _name,
-        uint256 _targetAmount,
-        uint256 _unlockTime
+        uint256 _targetAmount
     ) {
-        if (_targetAmount == 0 && _unlockTime == 0) {
-            revert InvalidUnlockCondition();
-        }
-        if (_unlockTime != 0 && _unlockTime <= block.timestamp) {
+        if (_targetAmount == 0) {
             revert InvalidUnlockCondition();
         }
 
         owner = _owner;
         name = _name;
         targetAmount = _targetAmount;
-        unlockTime = _unlockTime;
     }
 
     receive() external payable {
@@ -53,7 +45,6 @@ contract TipJar {
 
     function tip(string calldata message) external payable {
         if (msg.value == 0) revert ZeroTip();
-        if (withdrawn) revert AlreadyWithdrawn();
 
         tips.push(Tip({
             sender: msg.sender,
@@ -66,21 +57,13 @@ contract TipJar {
     }
 
     function canWithdraw() public view returns (bool) {
-        if (withdrawn) return false;
-
-        bool targetReached =
-            targetAmount != 0 && address(this).balance >= targetAmount;
-        bool dateReached =
-            unlockTime != 0 && block.timestamp >= unlockTime;
-
-        return targetReached || dateReached;
+        return address(this).balance >= targetAmount;
     }
 
     function withdraw() external {
         if (msg.sender != owner) revert NotOwner();
-        if (withdrawn) revert AlreadyWithdrawn();
         if (!canWithdraw()) revert WithdrawLocked();
-        if (withdrawing) revert AlreadyWithdrawn();
+        if (withdrawing) revert TransferFailed();
 
         uint256 amount = address(this).balance;
         withdrawing = true;
@@ -91,7 +74,6 @@ contract TipJar {
             revert TransferFailed();
         }
 
-        withdrawn = true;
         withdrawing = false;
         emit Withdrawn(owner, amount);
     }

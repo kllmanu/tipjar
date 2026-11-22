@@ -20,22 +20,20 @@ contract TipJarFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         address indexed owner,
         address indexed jar,
         string name,
-        uint256 targetAmount,
-        uint256 unlockTime
+        uint256 targetAmount
     );
 
     function createJar(
         string calldata name,
-        uint256 targetAmount,
-        uint256 unlockTime
+        uint256 targetAmount
     ) external returns (address jarAddress) {
-        TipJar jar = new TipJar(msg.sender, name, targetAmount, unlockTime);
+        TipJar jar = new TipJar(msg.sender, name, targetAmount);
 
         jarAddress = address(jar);
         jars.push(jarAddress);
         jarsByOwner[msg.sender].push(jarAddress);
 
-        emit JarCreated(msg.sender, jarAddress, name, targetAmount, unlockTime);
+        emit JarCreated(msg.sender, jarAddress, name, targetAmount);
     }
 
     function getJarCount() external view returns (uint256) {
