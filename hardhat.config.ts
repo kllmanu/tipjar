@@ -1,6 +1,15 @@
+import "dotenv/config";
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import hardhatUpgrades from "@openzeppelin/hardhat-upgrades";
-import { configVariable, defineConfig } from "hardhat/config";
+import { defineConfig } from "hardhat/config";
+
+const sepoliaRpcUrl =
+  process.env.SEPOLIA_RPC_URL ??
+  (process.env.INFURA_API_KEY
+    ? `https://sepolia.infura.io/v3/${process.env.INFURA_API_KEY}`
+    : "");
+const sepoliaPrivateKey =
+  process.env.SEPOLIA_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
 
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthersPlugin, hardhatUpgrades],
@@ -37,8 +46,8 @@ export default defineConfig({
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+      url: sepoliaRpcUrl,
+      accounts: sepoliaPrivateKey ? [sepoliaPrivateKey] : [],
     },
   },
 });
