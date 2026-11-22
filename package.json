@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "serve": "npx serve frontend/"
+    "serve": "npx serve frontend/",
+    "deploy:local": "npx hardhat run scripts/deploy-tipjar.ts --network hardhatMainnet",
+    "deploy:sepolia": "npx hardhat run scripts/deploy-tipjar.ts --network sepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.2.2",

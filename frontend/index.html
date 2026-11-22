@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f2eedf" />
     <title>Tip Jar</title>
+    <script src="./config.js"></script>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -84,13 +85,6 @@
           <h2>Create a jar</h2>
         </div>
         <div class="jar-factory-settings">
-          <div class="settings-row">
-            <label for="factoryInput">TipJarFactory address</label>
-            <div>
-              <input id="factoryInput" type="text" placeholder="0x..." spellcheck="false" />
-              <button id="saveFactoryButton" type="button">Use factory</button>
-            </div>
-          </div>
           <div class="create-row">
             <label>
               Jar name
@@ -170,8 +164,7 @@
       const state = {
         provider: null,
         signer: null,
-        factoryAddress: localStorage.getItem("tipJarFactoryAddress") ||
-          new URLSearchParams(window.location.search).get("factory") || "",
+        factoryAddress: window.TIP_JAR_FACTORY_ADDRESS || "",
         jarAddress: localStorage.getItem("selectedTipJarAddress") || "",
         jarFilter: "all",
         nameFilter: ""
@@ -472,25 +465,13 @@
         }
       });
 
-      document.getElementById("saveFactoryButton").addEventListener("click", async () => {
-        try {
-          const address = ethers.getAddress(factoryInput.value.trim());
-          state.factoryAddress = address;
-          localStorage.setItem("tipJarFactoryAddress", address);
-          setStatus("Factory address saved.");
-          await loadJars();
-        } catch {
-          setStatus("Enter a valid Ethereum factory address.", "error");
-        }
-      });
-
       document.getElementById("createJarButton").addEventListener("click", async () => {
         if (!state.signer) {
           await connectWallet();
           if (!state.signer) return;
         }
         if (!state.factoryAddress) {
-          setStatus("Enter and save a factory address first.", "error");
+          setStatus("No factory contract is configured.", "error");
           return;
         }
 
@@ -556,7 +537,6 @@
       });
 
       connectButton.addEventListener("click", connectWallet);
-      factoryInput.value = state.factoryAddress;
       if (state.factoryAddress) {
         loadJars();
       }
