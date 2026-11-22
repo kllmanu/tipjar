@@ -175,7 +175,8 @@
         provider: null,
         signer: null,
         factoryAddress: window.TIP_JAR_FACTORY_ADDRESS || "",
-        jarAddress: localStorage.getItem("selectedTipJarAddress") || ""
+        jarAddress: localStorage.getItem("selectedTipJarAddress") || "",
+        legacyJar: false
       };
 
       const connectButton = document.getElementById("connectButton");
@@ -375,6 +376,16 @@
               jar.owner()
             ]);
 
+          let legacyWithdrawn = false;
+          state.legacyJar = false;
+          try {
+            legacyWithdrawn = await jar.withdrawn();
+            state.legacyJar = true;
+          } catch {
+            legacyWithdrawn = false;
+            state.legacyJar = false;
+          }
+
           document.getElementById("jarTitle").innerHTML =
             `<a class="jar-title-link" href="${etherscanAddressUrl(state.jarAddress)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`;
           document.getElementById("jarBalance").textContent =
@@ -400,8 +411,11 @@
           withdrawButton.textContent = unlocked
             ? `Withdraw ${ethers.formatEther(balance)} ETH`
             : "Target not reached";
-          sendButton.disabled = false;
-          sendButtonText.textContent = "Send tip";
+          sendButton.hidden = false;
+          sendButton.disabled = state.legacyJar;
+          sendButtonText.textContent = state.legacyJar
+            ? "Legacy jar — tipping unavailable"
+            : "Send tip";
 
           await loadTips(jar);
         } catch (error) {
@@ -491,6 +505,7 @@
       });
 
       sendButton.addEventListener("click", async () => {
+        if (state.legacyJar) return;
         if (!state.signer) {
           await connectWallet();
           if (!state.signer) return;
@@ -521,8 +536,10 @@
         } catch (error) {
           setStatus(getRpcError(error), "error");
         } finally {
-          sendButton.disabled = false;
-          sendButtonText.textContent = "Send tip";
+          sendButton.disabled = state.legacyJar;
+          sendButtonText.textContent = state.legacyJar
+            ? "Legacy jar — tipping unavailable"
+            : "Send tip";
         }
       });
 
