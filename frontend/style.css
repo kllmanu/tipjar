@@ -551,6 +551,137 @@ textarea {
   font-weight: 800;
 }
 
+.jar-progress {
+  margin: -2px 0 20px;
+}
+
+.progress-track {
+  height: 8px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--blue);
+  transition: width 300ms ease;
+}
+
+.progress-copy {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: rgba(23, 23, 19, 0.68);
+  font-size: 11px;
+}
+
+.withdraw-button {
+  width: 100%;
+  height: 46px;
+  margin-top: 10px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font-weight: 800;
+}
+
+.withdraw-button:not(:disabled) {
+  color: var(--white);
+  background: var(--ink);
+}
+
+.withdraw-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.jar-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  min-height: 72px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--soft-line);
+}
+
+.jar-row {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--ink);
+  background: var(--white);
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.jar-row.active {
+  color: var(--white);
+  background: var(--blue);
+}
+
+.recent-heading {
+  margin-top: 20px;
+}
+
+.create-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--soft-line);
+}
+
+.create-row label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+  position: relative;
+}
+
+.create-row label span {
+  position: absolute;
+  right: 10px;
+  bottom: 13px;
+  color: var(--blue);
+  font-size: 11px;
+}
+
+.create-row input {
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--ink);
+  background: var(--white);
+  padding: 0 44px 0 12px;
+}
+
+.create-row label:last-of-type input {
+  padding-right: 12px;
+}
+
+.create-row button {
+  height: 44px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--white);
+  padding: 0 18px;
+  font-weight: 800;
+}
+
+.jar-body span {
+  max-width: 150px;
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0;
+  text-align: center;
+  transform: none;
+}
+
 @media (max-width: 900px) {
   .page-shell {
     width: min(100% - 32px, 680px);
@@ -663,6 +794,18 @@ textarea {
 
   .settings-row > div {
     gap: 8px;
+  }
+
+  .jar-list {
+    grid-template-columns: 1fr;
+  }
+
+  .create-row {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-copy {
+    flex-direction: column;
   }
 }
 

@@ -21,10 +21,10 @@
 
       <section class="hero">
         <div class="intro">
-          <p class="kicker">Direct on-chain appreciation</p>
-          <h1>Leave a little<br /><em>thanks.</em></h1>
+          <p class="kicker">Programmable on-chain savings</p>
+          <h1>Save for<br /><em>something.</em></h1>
           <p class="lede">
-            Every tip goes directly to the creator and a shared recipient.
+            Create a jar, accept tips, and unlock funds by amount or date.
           </p>
 
           <div class="jar-figure" aria-label="A stylized tip jar">
@@ -32,28 +32,30 @@
             <div class="coin coin-two">Ξ</div>
             <div class="jar-lid"></div>
             <div class="jar-neck"></div>
-            <div class="jar-body">
-              <span>THANKS!</span>
-            </div>
+            <div class="jar-body"><span id="jarBalance">0 ETH</span></div>
           </div>
         </div>
 
         <aside class="tip-panel" aria-label="Send a tip">
           <div class="panel-heading">
-            <span>Choose an amount</span>
+            <span id="jarTitle">Choose a jar</span>
             <span class="currency" id="networkName">ETH</span>
           </div>
 
+          <div class="jar-progress">
+            <div class="progress-track">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div class="progress-copy">
+              <span id="progressAmount">No target set</span>
+              <span id="unlockDate">No date set</span>
+            </div>
+          </div>
+
           <div class="amount-grid" role="radiogroup" aria-label="Tip amount">
-            <button class="amount-button" type="button" data-amount="0.001" role="radio" aria-checked="false">
-              0.001
-            </button>
-            <button class="amount-button selected" type="button" data-amount="0.005" role="radio" aria-checked="true">
-              0.005
-            </button>
-            <button class="amount-button" type="button" data-amount="0.01" role="radio" aria-checked="false">
-              0.01
-            </button>
+            <button class="amount-button" type="button" data-amount="0.001" role="radio" aria-checked="false">0.001</button>
+            <button class="amount-button selected" type="button" data-amount="0.005" role="radio" aria-checked="true">0.005</button>
+            <button class="amount-button" type="button" data-amount="0.01" role="radio" aria-checked="false">0.01</button>
           </div>
 
           <label class="field-label" for="amountInput">Other amount</label>
@@ -65,79 +67,100 @@
           <label class="field-label" for="messageInput">Add a note</label>
           <textarea id="messageInput" maxlength="280" rows="3" placeholder="Thanks for making this!"></textarea>
 
-          <div class="split-summary">
-            <span>You send</span>
-            <strong id="sendAmount">0.005 ETH</strong>
-          </div>
-
           <button class="send-button" id="sendButton" type="button">
             <span id="sendButtonText">Send tip</span>
             <span aria-hidden="true">→</span>
           </button>
 
+          <button class="withdraw-button" id="withdrawButton" type="button" disabled>
+            Withdraw
+          </button>
           <p class="status" id="status" role="status" aria-live="polite"></p>
         </aside>
       </section>
 
       <section class="activity">
         <div class="activity-heading">
-          <h2>Recent thanks</h2>
+          <h2>Your jars</h2>
           <button class="text-button" id="refreshButton" type="button">Refresh</button>
         </div>
 
-        <div class="split-details" id="splitDetails">
-          <span>20% shared</span>
-          <span id="contractAddress">Contract not configured</span>
+        <div class="jar-list" id="jarList">
+          <div class="empty-state"><span>No jars selected.</span></div>
         </div>
 
+        <div class="activity-heading recent-heading">
+          <h2>Recent thanks</h2>
+        </div>
         <div class="tips-list" id="tipsList">
-          <div class="empty-state">
-            <span>Nothing in the jar yet.</span>
-          </div>
+          <div class="empty-state"><span>Select a jar to see its tips.</span></div>
         </div>
       </section>
 
-      <details class="contract-settings">
-        <summary>Contract settings</summary>
+      <details class="contract-settings" open>
+        <summary>Jar setup</summary>
         <div class="settings-row">
-          <label for="contractInput">Deployed contract address</label>
+          <label for="factoryInput">TipJarFactory address</label>
           <div>
-            <input id="contractInput" type="text" placeholder="0x..." spellcheck="false" />
-            <button id="saveContractButton" type="button">Use contract</button>
+            <input id="factoryInput" type="text" placeholder="0x..." spellcheck="false" />
+            <button id="saveFactoryButton" type="button">Use factory</button>
           </div>
+        </div>
+        <div class="create-row">
+          <label>
+            Target amount
+            <input id="targetInput" type="number" min="0" step="0.001" placeholder="No target" />
+            <span>ETH</span>
+          </label>
+          <label>
+            Unlock date
+            <input id="dateInput" type="datetime-local" />
+          </label>
+          <button id="createJarButton" type="button">Create jar</button>
         </div>
       </details>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
     <script>
-      const ABI = [
+      const FACTORY_ABI = [
+        "function createJar(uint256 targetAmount, uint256 unlockTime) returns (address)",
+        "function getJarCount() view returns (uint256)",
+        "function getJar(uint256 index) view returns (address)",
+        "function getOwnerJarCount(address owner) view returns (uint256)",
+        "function getOwnerJar(address owner, uint256 index) view returns (address)",
+        "event JarCreated(address indexed owner, address indexed jar, uint256 targetAmount, uint256 unlockTime)"
+      ];
+
+      const JAR_ABI = [
         "function owner() view returns (address)",
-        "function splitRecipient() view returns (address)",
-        "function splitBps() view returns (uint16)",
+        "function targetAmount() view returns (uint256)",
+        "function unlockTime() view returns (uint256)",
+        "function withdrawn() view returns (bool)",
+        "function canWithdraw() view returns (bool)",
         "function tip(string message) payable",
+        "function withdraw()",
         "function getTipsCount() view returns (uint256)",
-        "function getTip(uint256 index) view returns (tuple(address sender, uint256 amount, string message, uint256 timestamp))",
-        "event TipReceived(address indexed sender, uint256 totalAmount, uint256 splitAmount, string message)"
+        "function getTip(uint256 index) view returns (tuple(address sender, uint256 amount, string message, uint256 timestamp))"
       ];
 
       const state = {
         provider: null,
         signer: null,
-        contractAddress: localStorage.getItem("splitTipJarAddress") ||
-          new URLSearchParams(window.location.search).get("contract") ||
-          "",
-        selectedAmount: "0.005"
+        factoryAddress: localStorage.getItem("tipJarFactoryAddress") ||
+          new URLSearchParams(window.location.search).get("factory") || "",
+        jarAddress: localStorage.getItem("selectedTipJarAddress") || ""
       };
 
       const connectButton = document.getElementById("connectButton");
       const sendButton = document.getElementById("sendButton");
       const sendButtonText = document.getElementById("sendButtonText");
+      const withdrawButton = document.getElementById("withdrawButton");
       const amountInput = document.getElementById("amountInput");
       const messageInput = document.getElementById("messageInput");
       const statusElement = document.getElementById("status");
-      const contractInput = document.getElementById("contractInput");
-      const contractAddress = document.getElementById("contractAddress");
+      const factoryInput = document.getElementById("factoryInput");
+      const jarList = document.getElementById("jarList");
       const tipsList = document.getElementById("tipsList");
 
       function setStatus(message, kind = "") {
@@ -150,19 +173,21 @@
       }
 
       function formatDate(timestamp) {
-        if (!timestamp) return "Just now";
-        const date = new Date(Number(timestamp) * 1000);
+        if (!timestamp) return "No date set";
         return new Intl.DateTimeFormat(undefined, {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit"
-        }).format(date);
+          month: "short", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit"
+        }).format(new Date(Number(timestamp) * 1000));
       }
 
-      function getContract(signerOrProvider = state.provider) {
-        if (!state.contractAddress) throw new Error("Enter a deployed contract address.");
-        return new ethers.Contract(state.contractAddress, ABI, signerOrProvider);
+      function getFactory(signerOrProvider = state.provider) {
+        if (!state.factoryAddress) throw new Error("Enter a deployed factory address.");
+        return new ethers.Contract(state.factoryAddress, FACTORY_ABI, signerOrProvider);
+      }
+
+      function getJar(signerOrProvider = state.provider) {
+        if (!state.jarAddress) throw new Error("Select or create a jar.");
+        return new ethers.Contract(state.jarAddress, JAR_ABI, signerOrProvider);
       }
 
       async function connectWallet() {
@@ -181,62 +206,121 @@
           document.getElementById("networkName").textContent =
             network.name === "unknown" ? `Chain ${network.chainId}` : network.name;
           setStatus("Wallet connected.");
-          await loadContract();
+          await loadJars();
+          await loadSelectedJar();
         } catch (error) {
           setStatus(error.shortMessage || error.message, "error");
         }
       }
 
-      async function loadContract() {
-        if (!state.contractAddress) {
-          contractAddress.textContent = "Contract not configured";
-          return;
-        }
-
-        contractInput.value = state.contractAddress;
-        contractAddress.textContent = shortenAddress(state.contractAddress);
+      async function loadJars() {
+        if (!state.signer || !state.factoryAddress) return;
 
         try {
-          const contract = getContract();
-          const [splitBps, recipient] = await Promise.all([
-            contract.splitBps(),
-            contract.splitRecipient()
-          ]);
-          const percent = Number(splitBps) / 100;
-          document.getElementById("splitDetails").innerHTML =
-            `<span>${percent}% shared</span>` +
-            `<span title="${recipient}">Recipient ${shortenAddress(recipient)}</span>`;
-          await loadTips(contract);
+          const factory = getFactory();
+          const owner = await state.signer.getAddress();
+          const count = await factory.getOwnerJarCount(owner);
+          const addresses = await Promise.all(
+            Array.from({ length: Number(count) }, (_, index) =>
+              factory.getOwnerJar(owner, index))
+          );
+
+          if (addresses.length === 0) {
+            jarList.innerHTML = `<div class="empty-state"><span>You have not created a jar yet.</span></div>`;
+            return;
+          }
+
+          jarList.innerHTML = addresses.map((address) => `
+            <button class="jar-row${address === state.jarAddress ? " active" : ""}" type="button" data-address="${address}">
+              <span>${shortenAddress(address)}</span>
+              <span>Open jar →</span>
+            </button>
+          `).join("");
+
+          document.querySelectorAll(".jar-row").forEach((button) => {
+            button.addEventListener("click", () => {
+              state.jarAddress = button.dataset.address;
+              localStorage.setItem("selectedTipJarAddress", state.jarAddress);
+              loadJars();
+              loadSelectedJar();
+            });
+          });
+
+          if (!state.jarAddress && addresses[0]) {
+            state.jarAddress = addresses[0];
+            localStorage.setItem("selectedTipJarAddress", state.jarAddress);
+            await loadJars();
+            await loadSelectedJar();
+          }
         } catch (error) {
-          setStatus(error.shortMessage || "Could not read this contract.", "error");
+          setStatus(error.shortMessage || "Could not load your jars.", "error");
         }
       }
 
-      async function loadTips(contract = null) {
-        if (!state.contractAddress) return;
+      async function loadSelectedJar() {
+        if (!state.jarAddress) return;
 
         try {
-          const jar = contract || getContract();
-          const count = await jar.getTipsCount();
+          const jar = getJar();
+          const [target, unlock, balance, withdrawn, unlocked, owner] =
+            await Promise.all([
+              jar.targetAmount(),
+              jar.unlockTime(),
+              state.provider.getBalance(state.jarAddress),
+              jar.withdrawn(),
+              jar.canWithdraw(),
+              jar.owner()
+            ]);
+
+          document.getElementById("jarTitle").textContent = shortenAddress(state.jarAddress);
+          document.getElementById("jarBalance").textContent =
+            `${ethers.formatEther(balance)} ETH`;
+
+          const targetText = target === 0n
+            ? "No target"
+            : `${ethers.formatEther(target)} ETH target`;
+          document.getElementById("progressAmount").textContent = targetText;
+          document.getElementById("unlockDate").textContent =
+            unlock === 0n ? "No date set" : `Until ${formatDate(unlock)}`;
+
+          const progress = target === 0n
+            ? (unlocked ? 100 : 0)
+            : Math.min(100, Number(balance * 100n / target));
+          document.getElementById("progressBar").style.width = `${progress}%`;
+
+          let unlockedAddress = null;
+          if (state.signer) unlockedAddress = await state.signer.getAddress();
+          withdrawButton.disabled =
+            withdrawn || !unlocked || unlockedAddress !== owner;
+
+          await loadTips(jar);
+        } catch (error) {
+          setStatus(error.shortMessage || "Could not read this jar.", "error");
+        }
+      }
+
+      async function loadTips(jar = null) {
+        if (!state.jarAddress) return;
+
+        try {
+          const selectedJar = jar || getJar();
+          const count = await selectedJar.getTipsCount();
           const indexes = [];
           for (let index = Number(count) - 1; index >= 0 && indexes.length < 8; index--) {
             indexes.push(index);
           }
 
           if (indexes.length === 0) {
-            tipsList.innerHTML = `<div class="empty-state"><span>Nothing in the jar yet.</span></div>`;
+            tipsList.innerHTML = `<div class="empty-state"><span>Nothing in this jar yet.</span></div>`;
             return;
           }
 
-          const tips = await Promise.all(indexes.map((index) => jar.getTip(index)));
+          const tips = await Promise.all(indexes.map((index) => selectedJar.getTip(index)));
           tipsList.innerHTML = tips.map((tip) => `
             <article class="tip-row">
               <div class="tip-identity">
-                <span class="tip-avatar" aria-hidden="true">Ξ</span>
-                <div>
-                  <strong>${shortenAddress(tip.sender)}</strong>
-                  <time>${formatDate(tip.timestamp)}</time>
-                </div>
+                <span class="tip-avatar">Ξ</span>
+                <div><strong>${shortenAddress(tip.sender)}</strong><time>${formatDate(tip.timestamp)}</time></div>
               </div>
               <p>${escapeHtml(tip.message || "A little thanks")}</p>
               <strong class="tip-amount">${ethers.formatEther(tip.amount)} ETH</strong>
@@ -261,23 +345,8 @@
           });
           button.classList.add("selected");
           button.setAttribute("aria-checked", "true");
-          state.selectedAmount = button.dataset.amount;
-          amountInput.value = state.selectedAmount;
-          updateSendAmount();
+          amountInput.value = button.dataset.amount;
         });
-      });
-
-      function updateSendAmount() {
-        document.getElementById("sendAmount").textContent =
-          `${amountInput.value || "0"} ETH`;
-      }
-
-      amountInput.addEventListener("input", () => {
-        document.querySelectorAll(".amount-button").forEach((item) => {
-          item.classList.remove("selected");
-          item.setAttribute("aria-checked", "false");
-        });
-        updateSendAmount();
       });
 
       sendButton.addEventListener("click", async () => {
@@ -285,11 +354,8 @@
           await connectWallet();
           if (!state.signer) return;
         }
-
-        if (!state.contractAddress) {
-          setStatus("Enter and save a deployed contract address first.", "error");
-          document.querySelector(".contract-settings").open = true;
-          contractInput.focus();
+        if (!state.jarAddress) {
+          setStatus("Select or create a jar first.", "error");
           return;
         }
 
@@ -301,17 +367,16 @@
 
         sendButton.disabled = true;
         sendButtonText.textContent = "Sending...";
-
         try {
-          const contract = getContract(state.signer);
-          const transaction = await contract.tip(messageInput.value.trim(), {
+          const jar = getJar(state.signer);
+          const transaction = await jar.tip(messageInput.value.trim(), {
             value: ethers.parseEther(amount)
           });
           setStatus("Tip submitted. Waiting for confirmation...");
           await transaction.wait();
           setStatus("Tip delivered. Thank you!");
           messageInput.value = "";
-          await loadTips(contract);
+          await loadSelectedJar();
         } catch (error) {
           setStatus(error.shortMessage || error.message, "error");
         } finally {
@@ -320,33 +385,84 @@
         }
       });
 
-      document.getElementById("saveContractButton").addEventListener("click", async () => {
-        const address = contractInput.value.trim();
+      withdrawButton.addEventListener("click", async () => {
+        withdrawButton.disabled = true;
+        try {
+          const jar = getJar(state.signer);
+          const transaction = await jar.withdraw();
+          setStatus("Withdrawal submitted. Waiting for confirmation...");
+          await transaction.wait();
+          setStatus("Funds withdrawn.");
+          await loadSelectedJar();
+        } catch (error) {
+          setStatus(error.shortMessage || error.message, "error");
+        }
+      });
+
+      document.getElementById("saveFactoryButton").addEventListener("click", async () => {
+        try {
+          const address = ethers.getAddress(factoryInput.value.trim());
+          state.factoryAddress = address;
+          localStorage.setItem("tipJarFactoryAddress", address);
+          setStatus("Factory address saved.");
+          await loadJars();
+        } catch {
+          setStatus("Enter a valid Ethereum factory address.", "error");
+        }
+      });
+
+      document.getElementById("createJarButton").addEventListener("click", async () => {
+        if (!state.signer) {
+          await connectWallet();
+          if (!state.signer) return;
+        }
+        if (!state.factoryAddress) {
+          setStatus("Enter and save a factory address first.", "error");
+          return;
+        }
+
+        const targetValue = document.getElementById("targetInput").value;
+        const dateValue = document.getElementById("dateInput").value;
+        const target = targetValue ? ethers.parseEther(targetValue) : 0n;
+        const unlock = dateValue ? BigInt(Math.floor(new Date(dateValue).getTime() / 1000)) : 0n;
+
+        if (target === 0n && unlock === 0n) {
+          setStatus("Set a target amount or an unlock date.", "error");
+          return;
+        }
 
         try {
-          const checksumAddress = ethers.getAddress(address);
-          state.contractAddress = checksumAddress;
-          localStorage.setItem("splitTipJarAddress", checksumAddress);
-          setStatus("Contract address saved.");
-          await loadContract();
-        } catch {
-          setStatus("Enter a valid Ethereum contract address.", "error");
+          const factory = getFactory(state.signer);
+          const transaction = await factory.createJar(target, unlock);
+          setStatus("Creating jar. Waiting for confirmation...");
+          const receipt = await transaction.wait();
+          const createdEvent = receipt.logs
+            .map((log) => {
+              try { return factory.interface.parseLog(log); } catch { return null; }
+            })
+            .find((event) => event?.name === "JarCreated");
+
+          if (!createdEvent) throw new Error("Jar was created but its address could not be found.");
+          state.jarAddress = createdEvent.args.jar;
+          localStorage.setItem("selectedTipJarAddress", state.jarAddress);
+          setStatus("Jar created.");
+          await loadJars();
+          await loadSelectedJar();
+        } catch (error) {
+          setStatus(error.shortMessage || error.message, "error");
         }
       });
 
       document.getElementById("refreshButton").addEventListener("click", async () => {
-        await loadTips();
-        setStatus("Recent tips refreshed.");
+        await loadJars();
+        await loadSelectedJar();
       });
 
       connectButton.addEventListener("click", connectWallet);
-
-      contractInput.value = state.contractAddress;
-      updateSendAmount();
-      if (state.contractAddress) {
-        loadContract();
+      factoryInput.value = state.factoryAddress;
+      if (state.jarAddress) {
+        loadSelectedJar();
       }
-
       if (window.ethereum) {
         window.ethereum.on("accountsChanged", connectWallet);
       }
