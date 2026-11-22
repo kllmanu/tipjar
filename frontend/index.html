@@ -79,10 +79,54 @@
         </aside>
       </section>
 
+      <section class="create-jar-section">
+        <div class="activity-heading">
+          <h2>Create a jar</h2>
+        </div>
+        <div class="jar-factory-settings">
+          <div class="settings-row">
+            <label for="factoryInput">TipJarFactory address</label>
+            <div>
+              <input id="factoryInput" type="text" placeholder="0x..." spellcheck="false" />
+              <button id="saveFactoryButton" type="button">Use factory</button>
+            </div>
+          </div>
+          <div class="create-row">
+            <label>
+              Jar name
+              <input id="jarNameInput" type="text" maxlength="40" placeholder="Studio fund" />
+            </label>
+            <label>
+              Target amount
+              <input id="targetInput" type="number" min="0" step="0.001" placeholder="No target" />
+              <span>ETH</span>
+            </label>
+            <label>
+              Unlock date
+              <input id="dateInput" type="datetime-local" />
+            </label>
+            <button id="createJarButton" type="button">Create jar</button>
+          </div>
+        </div>
+      </section>
+
       <section class="activity">
         <div class="activity-heading">
-          <h2>Your jars</h2>
+          <h2>Jars</h2>
           <button class="text-button" id="refreshButton" type="button">Refresh</button>
+        </div>
+
+        <div class="jar-filters" aria-label="Filter jars">
+          <button class="jar-filter active" type="button" data-filter="all">All</button>
+          <button class="jar-filter" type="button" data-filter="mine">Created by me</button>
+          <button class="jar-filter" type="button" data-filter="name">By name</button>
+          <input
+            id="nameFilter"
+            type="text"
+            placeholder="Search jar name"
+            spellcheck="false"
+            hidden
+          />
         </div>
 
         <div class="jar-list" id="jarList">
@@ -90,50 +134,29 @@
         </div>
 
         <div class="activity-heading recent-heading">
-          <h2>Recent thanks</h2>
+          <h2>Recent tips</h2>
         </div>
         <div class="tips-list" id="tipsList">
           <div class="empty-state"><span>Select a jar to see its tips.</span></div>
         </div>
       </section>
 
-      <details class="contract-settings" open>
-        <summary>Jar setup</summary>
-        <div class="settings-row">
-          <label for="factoryInput">TipJarFactory address</label>
-          <div>
-            <input id="factoryInput" type="text" placeholder="0x..." spellcheck="false" />
-            <button id="saveFactoryButton" type="button">Use factory</button>
-          </div>
-        </div>
-        <div class="create-row">
-          <label>
-            Target amount
-            <input id="targetInput" type="number" min="0" step="0.001" placeholder="No target" />
-            <span>ETH</span>
-          </label>
-          <label>
-            Unlock date
-            <input id="dateInput" type="datetime-local" />
-          </label>
-          <button id="createJarButton" type="button">Create jar</button>
-        </div>
-      </details>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
     <script>
       const FACTORY_ABI = [
-        "function createJar(uint256 targetAmount, uint256 unlockTime) returns (address)",
+        "function createJar(string name, uint256 targetAmount, uint256 unlockTime) returns (address)",
         "function getJarCount() view returns (uint256)",
         "function getJar(uint256 index) view returns (address)",
         "function getOwnerJarCount(address owner) view returns (uint256)",
         "function getOwnerJar(address owner, uint256 index) view returns (address)",
-        "event JarCreated(address indexed owner, address indexed jar, uint256 targetAmount, uint256 unlockTime)"
+        "event JarCreated(address indexed owner, address indexed jar, string name, uint256 targetAmount, uint256 unlockTime)"
       ];
 
       const JAR_ABI = [
         "function owner() view returns (address)",
+        "function name() view returns (string)",
         "function targetAmount() view returns (uint256)",
         "function unlockTime() view returns (uint256)",
         "function withdrawn() view returns (bool)",
@@ -149,7 +172,9 @@
         signer: null,
         factoryAddress: localStorage.getItem("tipJarFactoryAddress") ||
           new URLSearchParams(window.location.search).get("factory") || "",
-        jarAddress: localStorage.getItem("selectedTipJarAddress") || ""
+        jarAddress: localStorage.getItem("selectedTipJarAddress") || "",
+        jarFilter: "all",
+        nameFilter: ""
       };
 
       const connectButton = document.getElementById("connectButton");
@@ -190,6 +215,13 @@
         return new ethers.Contract(state.jarAddress, JAR_ABI, signerOrProvider);
       }
 
+      function ensureProvider() {
+        if (!state.provider && window.ethereum) {
+          state.provider = new ethers.BrowserProvider(window.ethereum);
+        }
+        return state.provider;
+      }
+
       async function connectWallet() {
         if (!window.ethereum) {
           setStatus("Install MetaMask or another Ethereum wallet.", "error");
@@ -214,28 +246,67 @@
       }
 
       async function loadJars() {
-        if (!state.signer || !state.factoryAddress) return;
+        if (!state.factoryAddress) return;
 
         try {
-          const factory = getFactory();
-          const owner = await state.signer.getAddress();
-          const count = await factory.getOwnerJarCount(owner);
-          const addresses = await Promise.all(
+          ensureProvider();
+          const factory = getFactory(state.provider);
+          const count = await factory.getJarCount();
+          const allAddresses = await Promise.all(
             Array.from({ length: Number(count) }, (_, index) =>
-              factory.getOwnerJar(owner, index))
+              factory.getJar(index))
           );
 
-          if (addresses.length === 0) {
-            jarList.innerHTML = `<div class="empty-state"><span>You have not created a jar yet.</span></div>`;
+          if (allAddresses.length === 0) {
+            jarList.innerHTML =
+              `<div class="empty-state"><span>No jars have been created yet.</span></div>`;
             return;
           }
 
-          jarList.innerHTML = addresses.map((address) => `
+          const jarOwners = await Promise.all(
+            allAddresses.map((address) =>
+              new ethers.Contract(address, JAR_ABI, state.provider).owner())
+          );
+          const jarNames = await Promise.all(
+            allAddresses.map((address) =>
+              new ethers.Contract(address, JAR_ABI, state.provider).name())
+          );
+
+          let addresses = allAddresses;
+          if (state.jarFilter === "mine") {
+            if (!state.signer) {
+              jarList.innerHTML =
+                `<div class="empty-state"><span>Connect your wallet to see jars you created.</span></div>`;
+              return;
+            }
+            const currentAddress = await state.signer.getAddress();
+            addresses = allAddresses.filter((_, index) =>
+              jarOwners[index].toLowerCase() === currentAddress.toLowerCase());
+          } else if (state.jarFilter === "name") {
+            const nameQuery = state.nameFilter.trim().toLowerCase();
+            if (!nameQuery) {
+              jarList.innerHTML =
+                `<div class="empty-state"><span>Enter a jar name to filter jars.</span></div>`;
+              return;
+            }
+            addresses = allAddresses.filter((_, index) =>
+              jarNames[index].toLowerCase().includes(nameQuery));
+          }
+
+          if (addresses.length === 0) {
+            jarList.innerHTML =
+              `<div class="empty-state"><span>No jars match this filter.</span></div>`;
+            return;
+          }
+
+          jarList.innerHTML = addresses.map((address) => {
+            const index = allAddresses.indexOf(address);
+            return `
             <button class="jar-row${address === state.jarAddress ? " active" : ""}" type="button" data-address="${address}">
-              <span>${shortenAddress(address)}</span>
+              <span>${escapeHtml(jarNames[index])}</span>
               <span>Open jar →</span>
             </button>
-          `).join("");
+          `}).join("");
 
           document.querySelectorAll(".jar-row").forEach((button) => {
             button.addEventListener("click", () => {
@@ -261,9 +332,11 @@
         if (!state.jarAddress) return;
 
         try {
-          const jar = getJar();
-          const [target, unlock, balance, withdrawn, unlocked, owner] =
+          ensureProvider();
+          const jar = getJar(state.provider);
+          const [name, target, unlock, balance, withdrawn, unlocked, owner] =
             await Promise.all([
+              jar.name(),
               jar.targetAmount(),
               jar.unlockTime(),
               state.provider.getBalance(state.jarAddress),
@@ -272,7 +345,7 @@
               jar.owner()
             ]);
 
-          document.getElementById("jarTitle").textContent = shortenAddress(state.jarAddress);
+          document.getElementById("jarTitle").textContent = name;
           document.getElementById("jarBalance").textContent =
             `${ethers.formatEther(balance)} ETH`;
 
@@ -423,9 +496,14 @@
 
         const targetValue = document.getElementById("targetInput").value;
         const dateValue = document.getElementById("dateInput").value;
+        const jarName = document.getElementById("jarNameInput").value.trim();
         const target = targetValue ? ethers.parseEther(targetValue) : 0n;
         const unlock = dateValue ? BigInt(Math.floor(new Date(dateValue).getTime() / 1000)) : 0n;
 
+        if (!jarName) {
+          setStatus("Enter a name for the jar.", "error");
+          return;
+        }
         if (target === 0n && unlock === 0n) {
           setStatus("Set a target amount or an unlock date.", "error");
           return;
@@ -433,7 +511,7 @@
 
         try {
           const factory = getFactory(state.signer);
-          const transaction = await factory.createJar(target, unlock);
+          const transaction = await factory.createJar(jarName, target, unlock);
           setStatus("Creating jar. Waiting for confirmation...");
           const receipt = await transaction.wait();
           const createdEvent = receipt.logs
@@ -458,8 +536,30 @@
         await loadSelectedJar();
       });
 
+      document.querySelectorAll(".jar-filter").forEach((button) => {
+        button.addEventListener("click", async () => {
+          document.querySelectorAll(".jar-filter").forEach((item) =>
+            item.classList.remove("active"));
+          button.classList.add("active");
+
+          state.jarFilter = button.dataset.filter;
+          const nameInput = document.getElementById("nameFilter");
+          nameInput.hidden = state.jarFilter !== "name";
+          if (state.jarFilter === "name") nameInput.focus();
+          await loadJars();
+        });
+      });
+
+      document.getElementById("nameFilter").addEventListener("input", async (event) => {
+        state.nameFilter = event.target.value.trim();
+        await loadJars();
+      });
+
       connectButton.addEventListener("click", connectWallet);
       factoryInput.value = state.factoryAddress;
+      if (state.factoryAddress) {
+        loadJars();
+      }
       if (state.jarAddress) {
         loadSelectedJar();
       }

@@ -10,21 +10,23 @@ contract TipJarFactory {
     event JarCreated(
         address indexed owner,
         address indexed jar,
+        string name,
         uint256 targetAmount,
         uint256 unlockTime
     );
 
     function createJar(
+        string calldata name,
         uint256 targetAmount,
         uint256 unlockTime
     ) external returns (address jarAddress) {
-        TipJar jar = new TipJar(msg.sender, targetAmount, unlockTime);
+        TipJar jar = new TipJar(msg.sender, name, targetAmount, unlockTime);
 
         jarAddress = address(jar);
         jars.push(jarAddress);
         jarsByOwner[msg.sender].push(jarAddress);
 
-        emit JarCreated(msg.sender, jarAddress, targetAmount, unlockTime);
+        emit JarCreated(msg.sender, jarAddress, name, targetAmount, unlockTime);
     }
 
     function getJarCount() external view returns (uint256) {

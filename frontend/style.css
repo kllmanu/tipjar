@@ -504,6 +504,15 @@ textarea {
   white-space: nowrap;
 }
 
+.create-jar-section {
+  padding: 54px 0 48px;
+  border-bottom: 1px solid var(--line);
+}
+
+.jar-factory-settings {
+  padding-top: 18px;
+}
+
 .contract-settings {
   border-top: 1px solid var(--line);
   padding: 18px 0 34px;
@@ -606,6 +615,41 @@ textarea {
   border-bottom: 1px solid var(--soft-line);
 }
 
+.jar-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 18px;
+}
+
+.jar-filter {
+  height: 38px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.jar-filter.active {
+  color: var(--white);
+  background: var(--ink);
+}
+
+.jar-filters input {
+  min-width: 220px;
+  height: 38px;
+  border: 1px solid var(--ink);
+  background: var(--white);
+  padding: 0 10px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.jar-filters input[hidden] {
+  display: none;
+}
+
 .jar-row {
   min-height: 54px;
   display: flex;
@@ -629,7 +673,7 @@ textarea {
 
 .create-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr auto;
   align-items: end;
   gap: 12px;
   margin-top: 18px;
@@ -798,6 +842,14 @@ textarea {
 
   .jar-list {
     grid-template-columns: 1fr;
+  }
+
+  .jar-filters {
+    flex-wrap: wrap;
+  }
+
+  .jar-filters input {
+    width: 100%;
   }
 
   .create-row {

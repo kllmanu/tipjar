@@ -10,6 +10,7 @@ contract TipJar {
     }
 
     address public immutable owner;
+    string public name;
     uint256 public immutable targetAmount;
     uint256 public immutable unlockTime;
 
@@ -27,7 +28,12 @@ contract TipJar {
     error AlreadyWithdrawn();
     error TransferFailed();
 
-    constructor(address _owner, uint256 _targetAmount, uint256 _unlockTime) {
+    constructor(
+        address _owner,
+        string memory _name,
+        uint256 _targetAmount,
+        uint256 _unlockTime
+    ) {
         if (_targetAmount == 0 && _unlockTime == 0) {
             revert InvalidUnlockCondition();
         }
@@ -36,6 +42,7 @@ contract TipJar {
         }
 
         owner = _owner;
+        name = _name;
         targetAmount = _targetAmount;
         unlockTime = _unlockTime;
     }

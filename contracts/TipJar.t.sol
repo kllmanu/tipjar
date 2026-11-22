@@ -9,7 +9,7 @@ contract TipJarTest is Test {
     receive() external payable {}
 
     function test_AmountUnlockAllowsWithdrawal() public {
-        TipJar jar = new TipJar(address(this), 1 ether, 0);
+        TipJar jar = new TipJar(address(this), "Concert fund", 1 ether, 0);
         vm.deal(address(this), 2 ether);
         jar.tip{value: 1 ether}("Funded");
 
@@ -22,7 +22,7 @@ contract TipJarTest is Test {
 
     function test_DateUnlockAllowsWithdrawal() public {
         uint256 unlockTime = block.timestamp + 1 days;
-        TipJar jar = new TipJar(address(this), 0, unlockTime);
+        TipJar jar = new TipJar(address(this), "Weekend fund", 0, unlockTime);
 
         vm.expectRevert(TipJar.WithdrawLocked.selector);
         jar.withdraw();
@@ -33,27 +33,28 @@ contract TipJarTest is Test {
 
     function test_FactoryCreatesOwnerJar() public {
         TipJarFactory factory = new TipJarFactory();
-        address jarAddress = factory.createJar(1 ether, 0);
+        address jarAddress = factory.createJar("Studio fund", 1 ether, 0);
         TipJar jar = TipJar(payable(jarAddress));
 
         assertEq(factory.getJarCount(), 1);
         assertEq(factory.getOwnerJarCount(address(this)), 1);
         assertEq(factory.getOwnerJar(address(this), 0), jarAddress);
         assertEq(jar.owner(), address(this));
+        assertEq(jar.name(), "Studio fund");
     }
 
     function test_RevertWhenNoUnlockCondition() public {
         vm.expectRevert(TipJar.InvalidUnlockCondition.selector);
-        new TipJar(address(this), 0, 0);
+        new TipJar(address(this), "Empty jar", 0, 0);
     }
 
     function test_RevertWhenPastUnlockDate() public {
         vm.expectRevert(TipJar.InvalidUnlockCondition.selector);
-        new TipJar(address(this), 0, block.timestamp);
+        new TipJar(address(this), "Past jar", 0, block.timestamp);
     }
 
     function test_RevertForNonOwnerWithdrawal() public {
-        TipJar jar = new TipJar(address(this), 1 ether, 0);
+        TipJar jar = new TipJar(address(this), "Private fund", 1 ether, 0);
         vm.deal(address(this), 1 ether);
         jar.tip{value: 1 ether}("");
 
