@@ -504,6 +504,29 @@ textarea {
   white-space: nowrap;
 }
 
+.etherscan-link,
+.jar-title-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tip-amount .etherscan-link {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 11px;
+  text-align: right;
+}
+
+.jar-open-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0 0 0 8px;
+  font-weight: 800;
+}
+
 .create-jar-section {
   padding: 54px 0 48px;
   border-bottom: 1px solid var(--line);

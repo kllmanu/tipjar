@@ -158,7 +158,8 @@
         "function tip(string message) payable",
         "function withdraw()",
         "function getTipsCount() view returns (uint256)",
-        "function getTip(uint256 index) view returns (tuple(address sender, uint256 amount, string message, uint256 timestamp))"
+        "function getTip(uint256 index) view returns (tuple(address sender, uint256 amount, string message, uint256 timestamp))",
+        "event Tipped(address indexed sender, uint256 amount, string message)"
       ];
 
       const state = {
@@ -186,8 +187,28 @@
         statusElement.className = `status${kind ? ` ${kind}` : ""}`;
       }
 
+      function getRpcError(error) {
+        return (
+          error?.revert?.reason ||
+          error?.info?.error?.message ||
+          error?.error?.message ||
+          error?.shortMessage ||
+          error?.reason ||
+          error?.message ||
+          "The wallet or RPC provider returned an unknown error."
+        );
+      }
+
       function shortenAddress(address) {
         return `${address.slice(0, 6)}…${address.slice(-4)}`;
+      }
+
+      function etherscanAddressUrl(address) {
+        return `https://sepolia.etherscan.io/address/${address}`;
+      }
+
+      function etherscanTransactionUrl(hash) {
+        return `https://sepolia.etherscan.io/tx/${hash}`;
       }
 
       function formatDate(timestamp) {
@@ -234,7 +255,7 @@
           await loadJars();
           await loadSelectedJar();
         } catch (error) {
-          setStatus(error.shortMessage || error.message, "error");
+          setStatus(getRpcError(error), "error");
         }
       }
 
@@ -295,13 +316,16 @@
           jarList.innerHTML = addresses.map((address) => {
             const index = allAddresses.indexOf(address);
             return `
-            <button class="jar-row${address === state.jarAddress ? " active" : ""}" type="button" data-address="${address}">
+          <div class="jar-row${address === state.jarAddress ? " active" : ""}" data-address="${address}">
               <span>${escapeHtml(jarNames[index])}</span>
-              <span>Open jar →</span>
-            </button>
+            <span>
+              <a class="etherscan-link" href="${etherscanAddressUrl(address)}" target="_blank" rel="noopener noreferrer" data-address-link="true">Etherscan</a>
+              <button class="jar-open-button" type="button" data-address="${address}">Open jar →</button>
+            </span>
+          </div>
           `}).join("");
 
-          document.querySelectorAll(".jar-row").forEach((button) => {
+          document.querySelectorAll(".jar-open-button").forEach((button) => {
             button.addEventListener("click", () => {
               state.jarAddress = button.dataset.address;
               localStorage.setItem("selectedTipJarAddress", state.jarAddress);
@@ -317,7 +341,7 @@
             await loadSelectedJar();
           }
         } catch (error) {
-          setStatus(error.shortMessage || "Could not load your jars.", "error");
+          setStatus(getRpcError(error) || "Could not load your jars.", "error");
         }
       }
 
@@ -338,7 +362,8 @@
               jar.owner()
             ]);
 
-          document.getElementById("jarTitle").textContent = name;
+          document.getElementById("jarTitle").innerHTML =
+            `<a class="jar-title-link" href="${etherscanAddressUrl(state.jarAddress)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`;
           document.getElementById("jarBalance").textContent =
             `${ethers.formatEther(balance)} ETH`;
 
@@ -361,7 +386,7 @@
 
           await loadTips(jar);
         } catch (error) {
-          setStatus(error.shortMessage || "Could not read this jar.", "error");
+          setStatus(getRpcError(error) || "Could not read this jar.", "error");
         }
       }
 
@@ -382,18 +407,43 @@
           }
 
           const tips = await Promise.all(indexes.map((index) => selectedJar.getTip(index)));
-          tipsList.innerHTML = tips.map((tip) => `
+          let tipEvents = [];
+          try {
+            const latestBlock = await state.provider.getBlockNumber();
+            const fromBlock = Math.max(0, latestBlock - 50_000);
+            tipEvents = await selectedJar.queryFilter(
+              selectedJar.filters.Tipped(),
+              fromBlock,
+              "latest",
+            );
+            tipEvents.reverse();
+          } catch (eventError) {
+            console.warn("Could not load tip transactions:", getRpcError(eventError));
+          }
+          tipsList.innerHTML = tips.map((tip, position) => {
+            const tipEvent = tipEvents.find((event) =>
+              event.args.sender.toLowerCase() === tip.sender.toLowerCase() &&
+              event.args.amount === tip.amount &&
+              event.args.message === tip.message
+            );
+            const tipLink = tipEvent
+              ? etherscanTransactionUrl(tipEvent.transactionHash)
+              : etherscanAddressUrl(state.jarAddress);
+            return `
             <article class="tip-row">
               <div class="tip-identity">
                 <span class="tip-avatar">Ξ</span>
                 <div><strong>${shortenAddress(tip.sender)}</strong><time>${formatDate(tip.timestamp)}</time></div>
               </div>
               <p>${escapeHtml(tip.message || "A little thanks")}</p>
-              <strong class="tip-amount">${ethers.formatEther(tip.amount)} ETH</strong>
+              <strong class="tip-amount">
+                ${ethers.formatEther(tip.amount)} ETH
+                <a class="etherscan-link" href="${tipLink}" target="_blank" rel="noopener noreferrer">View tip ↗</a>
+              </strong>
             </article>
-          `).join("");
+          `}).join("");
         } catch (error) {
-          setStatus(error.shortMessage || "Could not load recent tips.", "error");
+          setStatus(getRpcError(error) || "Could not load recent tips.", "error");
         }
       }
 
@@ -444,7 +494,7 @@
           messageInput.value = "";
           await loadSelectedJar();
         } catch (error) {
-          setStatus(error.shortMessage || error.message, "error");
+          setStatus(getRpcError(error), "error");
         } finally {
           sendButton.disabled = false;
           sendButtonText.textContent = "Send tip";
@@ -461,7 +511,7 @@
           setStatus("Funds withdrawn.");
           await loadSelectedJar();
         } catch (error) {
-          setStatus(error.shortMessage || error.message, "error");
+          setStatus(getRpcError(error), "error");
         }
       });
 
@@ -508,7 +558,7 @@
           await loadJars();
           await loadSelectedJar();
         } catch (error) {
-          setStatus(error.shortMessage || error.message, "error");
+          setStatus(getRpcError(error), "error");
         }
       });
 
