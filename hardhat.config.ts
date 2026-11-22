@@ -1,6 +1,7 @@
 import "dotenv/config";
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import hardhatUpgrades from "@openzeppelin/hardhat-upgrades";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import { defineConfig } from "hardhat/config";
 
 const sepoliaRpcUrl =
@@ -12,7 +13,12 @@ const sepoliaPrivateKey =
   process.env.SEPOLIA_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
 
 export default defineConfig({
-  plugins: [hardhatToolboxMochaEthersPlugin, hardhatUpgrades],
+  plugins: [hardhatToolboxMochaEthersPlugin, hardhatUpgrades, hardhatVerify],
+  verify: {
+    etherscan: {
+      apiKey: process.env.ETHERSCAN_API_KEY ?? "",
+    },
+  },
   solidity: {
     profiles: {
       default: {
