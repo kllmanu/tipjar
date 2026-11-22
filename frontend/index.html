@@ -129,6 +129,10 @@
           <button class="text-button" id="refreshButton" type="button">Refresh</button>
         </div>
 
+        <p class="legacy-jars-note">
+          Older jars may no longer accept tips after their funds are withdrawn because they use the previous smart contract.
+        </p>
+
         <div class="jar-list" id="jarList">
           <div class="empty-state"><span>No jars selected.</span></div>
         </div>
@@ -158,6 +162,7 @@
         "function owner() view returns (address)",
         "function name() view returns (string)",
         "function targetAmount() view returns (uint256)",
+        "function withdrawn() view returns (bool)",
         "function canWithdraw() view returns (bool)",
         "function tip(string message) payable",
         "function withdraw()",
@@ -293,16 +298,29 @@
             allAddresses.map((address) =>
               new ethers.Contract(address, JAR_ABI, state.provider).targetAmount())
           );
+          const legacyWithdrawnStates = await Promise.all(
+            allAddresses.map(async (address) => {
+              try {
+                const legacyJar = new ethers.Contract(address, JAR_ABI, state.provider);
+                return await legacyJar.withdrawn();
+              } catch {
+                return null;
+              }
+            })
+          );
           const addresses = allAddresses;
 
           jarList.innerHTML = addresses.map((address) => {
             const index = allAddresses.indexOf(address);
             const targetText = `${ethers.formatEther(jarTargets[index])} ETH target`;
+            const legacyLabel = legacyWithdrawnStates[index] === true
+              ? '<span class="jar-status legacy-status">Legacy · withdrawn</span>'
+              : `<span class="jar-status">${targetText}</span>`;
             return `
           <div class="jar-row${address === state.jarAddress ? " active" : ""}" data-address="${address}">
               <span>
                 ${escapeHtml(jarNames[index])}
-                <span class="jar-status">${targetText}</span>
+                ${legacyLabel}
               </span>
             <span>
               <a class="etherscan-link" href="${etherscanAddressUrl(address)}" target="_blank" rel="noopener noreferrer" data-address-link="true">Etherscan</a>

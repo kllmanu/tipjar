@@ -559,6 +559,21 @@ textarea {
   border-bottom: 1px solid var(--soft-line);
 }
 
+.legacy-jars-note {
+  margin: 14px 0 0;
+  color: #77756b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.legacy-status {
+  color: #b52e20;
+}
+
+.jar-row.active .legacy-status {
+  color: var(--white);
+}
+
 .jar-row {
   min-height: 54px;
   display: flex;
