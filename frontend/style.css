@@ -461,6 +461,8 @@ textarea {
   gap: 24px;
   min-height: 96px;
   border-bottom: 1px solid var(--soft-line);
+  color: inherit;
+  text-decoration: none;
 }
 
 .tip-identity {
@@ -520,13 +522,6 @@ textarea {
   text-align: right;
 }
 
-.jar-open-button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 0 0 0 8px;
-  font-weight: 800;
-}
 
 .jar-status {
   display: block;
@@ -662,6 +657,7 @@ textarea {
   padding: 0 14px;
   font-size: 12px;
   font-weight: 800;
+  cursor: pointer;
 }
 
 .jar-row.active {
@@ -718,6 +714,18 @@ textarea {
   color: var(--white);
   padding: 0 18px;
   font-weight: 800;
+}
+
+.create-status {
+  min-height: 20px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.create-status.error {
+  color: #b52e20;
+  font-weight: 700;
 }
 
 .jar-body span {

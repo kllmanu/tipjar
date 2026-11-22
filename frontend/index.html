@@ -97,6 +97,7 @@
             </label>
             <button id="createJarButton" type="button">Create jar</button>
           </div>
+          <p class="create-status" id="createStatus" role="status" aria-live="polite"></p>
         </div>
       </section>
 
@@ -157,6 +158,7 @@
       const amountInput = document.getElementById("amountInput");
       const messageInput = document.getElementById("messageInput");
       const statusElement = document.getElementById("status");
+      const createStatusElement = document.getElementById("createStatus");
       const factoryInput = document.getElementById("factoryInput");
       const jarList = document.getElementById("jarList");
       const tipsList = document.getElementById("tipsList");
@@ -164,6 +166,11 @@
       function setStatus(message, kind = "") {
         statusElement.textContent = message;
         statusElement.className = `status${kind ? ` ${kind}` : ""}`;
+      }
+
+      function setCreateStatus(message, kind = "") {
+        createStatusElement.textContent = message;
+        createStatusElement.className = `create-status${kind ? ` ${kind}` : ""}`;
       }
 
       function getRpcError(error) {
@@ -277,14 +284,25 @@
               </span>
             <span>
               <a class="etherscan-link" href="${etherscanAddressUrl(address)}" target="_blank" rel="noopener noreferrer" data-address-link="true">Etherscan</a>
-              <button class="jar-open-button" type="button" data-address="${address}">Open jar →</button>
             </span>
           </div>
           `}).join("");
 
-          document.querySelectorAll(".jar-open-button").forEach((button) => {
-            button.addEventListener("click", () => {
-              state.jarAddress = button.dataset.address;
+          document.querySelectorAll(".jar-row").forEach((row) => {
+            row.setAttribute("role", "button");
+            row.setAttribute("tabindex", "0");
+            row.addEventListener("click", (event) => {
+              if (event.target.closest("[data-address-link]")) return;
+              state.jarAddress = row.dataset.address;
+              localStorage.setItem("selectedTipJarAddress", state.jarAddress);
+              loadJars();
+              loadSelectedJar();
+            });
+            row.addEventListener("keydown", (event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              if (event.target.closest("[data-address-link]")) return;
+              event.preventDefault();
+              state.jarAddress = row.dataset.address;
               localStorage.setItem("selectedTipJarAddress", state.jarAddress);
               loadJars();
               loadSelectedJar();
@@ -366,11 +384,9 @@
           const tips = await Promise.all(indexes.map((index) => selectedJar.getTip(index)));
           let tipEvents = [];
           try {
-            const latestBlock = await state.provider.getBlockNumber();
-            const fromBlock = Math.max(0, latestBlock - 50_000);
             tipEvents = await selectedJar.queryFilter(
               selectedJar.filters.Tipped(),
-              fromBlock,
+              0,
               "latest",
             );
             tipEvents.reverse();
@@ -388,10 +404,14 @@
               ? unmatchedTipEvents.splice(tipEventIndex, 1)[0]
               : null;
             const tipLink = tipEvent
-              ? `<a class="etherscan-link" href="${etherscanTransactionUrl(tipEvent.transactionHash)}" target="_blank" rel="noopener noreferrer">View tip ↗</a>`
+              ? etherscanTransactionUrl(tipEvent.transactionHash)
+              : null;
+            const rowTag = tipLink ? "a" : "article";
+            const rowAttributes = tipLink
+              ? `href="${tipLink}" target="_blank" rel="noopener noreferrer" aria-label="View this tip on Etherscan"`
               : "";
             return `
-            <article class="tip-row">
+            <${rowTag} class="tip-row" ${rowAttributes}>
               <div class="tip-identity">
                 <span class="tip-avatar">Ξ</span>
                 <div><strong>${shortenAddress(tip.sender)}</strong><time>${formatDate(tip.timestamp)}</time></div>
@@ -399,9 +419,9 @@
               <p>${escapeHtml(tip.message || "A little thanks")}</p>
               <strong class="tip-amount">
                 ${ethers.formatEther(tip.amount)} ETH
-                ${tipLink}
+                ${tipLink ? '<span class="etherscan-link">View tip ↗</span>' : ""}
               </strong>
-            </article>
+            </${rowTag}>
           `}).join("");
         } catch (error) {
           setStatus(getRpcError(error) || "Could not load recent tips.", "error");
@@ -486,7 +506,7 @@
           if (!state.signer) return;
         }
         if (!state.factoryAddress) {
-          setStatus("No factory contract is configured.", "error");
+          setCreateStatus("No factory contract is configured.", "error");
           return;
         }
 
@@ -495,18 +515,18 @@
         const target = targetValue ? ethers.parseEther(targetValue) : 0n;
 
         if (!jarName) {
-          setStatus("Enter a name for the jar.", "error");
+          setCreateStatus("Enter a name for the jar.", "error");
           return;
         }
         if (target === 0n) {
-          setStatus("Set a target amount.", "error");
+          setCreateStatus("Set a target amount.", "error");
           return;
         }
 
         try {
           const factory = getFactory(state.signer);
           const transaction = await factory.createJar(jarName, target);
-          setStatus("Creating jar. Waiting for confirmation...");
+          setCreateStatus("Creating jar. Waiting for confirmation...");
           const receipt = await transaction.wait();
           const createdEvent = receipt.logs
             .map((log) => {
@@ -517,11 +537,11 @@
           if (!createdEvent) throw new Error("Jar was created but its address could not be found.");
           state.jarAddress = createdEvent.args.jar;
           localStorage.setItem("selectedTipJarAddress", state.jarAddress);
-          setStatus("Jar created.");
+          setCreateStatus("Jar created.");
           await loadJars();
           await loadSelectedJar();
         } catch (error) {
-          setStatus(getRpcError(error), "error");
+          setCreateStatus(getRpcError(error), "error");
         }
       });
 
