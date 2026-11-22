@@ -2,10 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {TipJar} from "./TipJar.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract TipJarFactory {
+contract TipJarFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     address[] private jars;
     mapping(address => address[]) private jarsByOwner;
+
+    function initialize() external initializer {
+        __Ownable_init(msg.sender);
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     event JarCreated(
         address indexed owner,

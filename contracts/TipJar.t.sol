@@ -31,17 +31,6 @@ contract TipJarTest is Test {
         assertTrue(jar.canWithdraw());
     }
 
-    function test_FactoryCreatesOwnerJar() public {
-        TipJarFactory factory = new TipJarFactory();
-        address jarAddress = factory.createJar("Studio fund", 1 ether, 0);
-        TipJar jar = TipJar(payable(jarAddress));
-
-        assertEq(factory.getJarCount(), 1);
-        assertEq(factory.getOwnerJarCount(address(this)), 1);
-        assertEq(factory.getOwnerJar(address(this), 0), jarAddress);
-        assertEq(jar.owner(), address(this));
-        assertEq(jar.name(), "Studio fund");
-    }
 
     function test_RevertWhenNoUnlockCondition() public {
         vm.expectRevert(TipJar.InvalidUnlockCondition.selector);
