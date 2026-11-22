@@ -15,6 +15,7 @@
 
 html {
   min-height: 100%;
+  color-scheme: light;
   background: var(--paper);
 }
 
@@ -525,6 +526,19 @@ textarea {
   color: inherit;
   padding: 0 0 0 8px;
   font-weight: 800;
+}
+
+.jar-status {
+  display: block;
+  margin-top: 5px;
+  color: var(--blue);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jar-status.withdrawn {
+  color: #b52e20;
 }
 
 .create-jar-section {

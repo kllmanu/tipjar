@@ -113,14 +113,6 @@
         <div class="jar-filters" aria-label="Filter jars">
           <button class="jar-filter active" type="button" data-filter="all">All</button>
           <button class="jar-filter" type="button" data-filter="mine">Created by me</button>
-          <button class="jar-filter" type="button" data-filter="name">By name</button>
-          <input
-            id="nameFilter"
-            type="text"
-            placeholder="Search jar name"
-            spellcheck="false"
-            hidden
-          />
         </div>
 
         <div class="jar-list" id="jarList">
@@ -167,8 +159,7 @@
         signer: null,
         factoryAddress: window.TIP_JAR_FACTORY_ADDRESS || "",
         jarAddress: localStorage.getItem("selectedTipJarAddress") || "",
-        jarFilter: "all",
-        nameFilter: ""
+        jarFilter: "all"
       };
 
       const connectButton = document.getElementById("connectButton");
@@ -285,6 +276,10 @@
             allAddresses.map((address) =>
               new ethers.Contract(address, JAR_ABI, state.provider).name())
           );
+          const jarWithdrawnStates = await Promise.all(
+            allAddresses.map((address) =>
+              new ethers.Contract(address, JAR_ABI, state.provider).withdrawn())
+          );
 
           let addresses = allAddresses;
           if (state.jarFilter === "mine") {
@@ -296,15 +291,6 @@
             const currentAddress = await state.signer.getAddress();
             addresses = allAddresses.filter((_, index) =>
               jarOwners[index].toLowerCase() === currentAddress.toLowerCase());
-          } else if (state.jarFilter === "name") {
-            const nameQuery = state.nameFilter.trim().toLowerCase();
-            if (!nameQuery) {
-              jarList.innerHTML =
-                `<div class="empty-state"><span>Enter a jar name to filter jars.</span></div>`;
-              return;
-            }
-            addresses = allAddresses.filter((_, index) =>
-              jarNames[index].toLowerCase().includes(nameQuery));
           }
 
           if (addresses.length === 0) {
@@ -315,9 +301,15 @@
 
           jarList.innerHTML = addresses.map((address) => {
             const index = allAddresses.indexOf(address);
+            const withdrawnLabel = jarWithdrawnStates[index]
+              ? `<span class="jar-status withdrawn">Withdrawn</span>`
+              : `<span class="jar-status">Active</span>`;
             return `
           <div class="jar-row${address === state.jarAddress ? " active" : ""}" data-address="${address}">
-              <span>${escapeHtml(jarNames[index])}</span>
+              <span>
+                ${escapeHtml(jarNames[index])}
+                ${withdrawnLabel}
+              </span>
             <span>
               <a class="etherscan-link" href="${etherscanAddressUrl(address)}" target="_blank" rel="noopener noreferrer" data-address-link="true">Etherscan</a>
               <button class="jar-open-button" type="button" data-address="${address}">Open jar →</button>
@@ -363,7 +355,7 @@
             ]);
 
           document.getElementById("jarTitle").innerHTML =
-            `<a class="jar-title-link" href="${etherscanAddressUrl(state.jarAddress)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`;
+            `<a class="jar-title-link" href="${etherscanAddressUrl(state.jarAddress)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}${withdrawn ? " · Withdrawn" : ""} ↗</a>`;
           document.getElementById("jarBalance").textContent =
             `${ethers.formatEther(balance)} ETH`;
 
@@ -383,8 +375,10 @@
           withdrawButton.textContent = withdrawn
             ? "Withdrawn"
             : unlocked
-              ? "Withdraw"
+              ? `Withdraw ${ethers.formatEther(balance)} ETH`
               : "Unlock condition not met";
+          sendButton.disabled = withdrawn;
+          sendButtonText.textContent = withdrawn ? "Jar withdrawn" : "Send tip";
 
           await loadTips(jar);
         } catch (error) {
@@ -580,16 +574,8 @@
           button.classList.add("active");
 
           state.jarFilter = button.dataset.filter;
-          const nameInput = document.getElementById("nameFilter");
-          nameInput.hidden = state.jarFilter !== "name";
-          if (state.jarFilter === "name") nameInput.focus();
           await loadJars();
         });
-      });
-
-      document.getElementById("nameFilter").addEventListener("input", async (event) => {
-        state.nameFilter = event.target.value.trim();
-        await loadJars();
       });
 
       connectButton.addEventListener("click", connectWallet);
